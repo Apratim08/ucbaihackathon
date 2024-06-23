@@ -7,10 +7,25 @@ import numpy as np
 import base64
 from comic_text_detector.inference import TextDetector
 from manga_ocr import MangaOcr
+from openai import OpenAI
 
 import PIL.Image as Image
 model_path = "../data/model/comictextdetector.pt"
 max_ratio = 16
+
+# Function to convert text to speech
+def text_to_speech(text_info, index):
+    client = OpenAI(
+        api_key='sk-proj-93GEfbtnP8t7WykBWiRlT3BlbkFJwZy8TObRJNV8K2Tju83t',
+    )
+
+    response = client.audio.speech.create(
+        model="tts-1",
+        voice="alloy",
+        input=text_info
+    )
+    file_path = "static/audio/output" + str(index) + ".mp3"
+    response.stream_to_file(file_path)
 
 
 # input: image as base64 np array
@@ -28,6 +43,7 @@ def text_ocr_to_dictionary(image_bytes):
   text_info = []
 
   for _, blk in enumerate(blk_list):
+    count = 0
     line_text = ""
     x,y,w,h = blk.xywh()
     for line_idx, _ in enumerate(blk.lines_array()):
@@ -36,6 +52,8 @@ def text_ocr_to_dictionary(image_bytes):
           crop_img = cv2.rotate(crop_img, cv2.ROTATE_90_CLOCKWISE)
         line_text += mocr(Image.fromarray(crop_img))
     if line_text:
+      text_to_speech(line_text, count)
+      count += 1
       text_info.append(
         {
           'text': line_text,
@@ -48,6 +66,7 @@ def text_ocr_to_dictionary(image_bytes):
           'keywords': []
         }
       )
+
   # print(text_info)
   return text_info
 
@@ -92,10 +111,9 @@ def populate_translation_keywords(text_info):
 
   return text_info
 
-# testing only, remove later
 if __name__ == "__main__":
   with open("../data/test_imgs/better.png", "rb") as image_file:
     encoded_string = base64.b64encode(image_file.read())
     infos = text_ocr_to_dictionary(encoded_string)
     infos = populate_translation_keywords(infos)
-    print(infos)
+    print("infos:", infos)
